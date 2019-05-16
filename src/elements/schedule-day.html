@@ -1,9 +1,8 @@
 <link rel="import" href="../../bower_components/polymer/polymer-element.html">
 
-<link rel="import" href="./shared-styles.html">
 <link rel="import" href="./session-element.html">
 <link rel="import" href="../mixins/scroll-functions.html">
-<link rel="import" href="../mixins/utils-functions.html">
+<link rel="import" href="./shared-styles.html">
 
 <dom-module id="schedule-day">
   <template>
@@ -63,6 +62,7 @@
           grid-column-gap: 16px;
           grid-row-gap: 32px;
           grid-template-columns: repeat(var(--tracks-number), 1fr);
+          margin-top: 32px;
         }
 
         .start-time {
@@ -89,14 +89,11 @@
     </style>
 
     <div class="grid" style$="--tracks-number: [[day.tracks.length]];">
-      <template is="dom-repeat" items="[[day.timeslots]]" as="timeslot" index-as="timeslotIndex">
-
+      <template is="dom-repeat" items="[[day.timeslots]]" as="timeslot" index-as="timeslotIndex" filter="_isMorning">
         <div id$="[[timeslot.startTime]]" class="start-time" style$="grid-area: [[_getTimePosition(timeslotIndex)]]">
           <span class="hours">[[_splitText(timeslot.startTime, ':', 0)]]</span>
           <span class="minutes">[[_splitText(timeslot.startTime, ':', 1)]]</span>
         </div>
-
-
         <a
           class="add-session"
           href$="/schedule/[[day.date]]#[[timeslot.startTime]]"
@@ -107,7 +104,6 @@
           <iron-icon class="add-session-icon" icon="hoverboard:add-circle-outline"></iron-icon>
           <span>{$ mySchedule.browseSession $}</span>
         </a>
-
         <template
           is="dom-repeat"
           items="[[timeslot.sessions]]"
@@ -118,26 +114,60 @@
           <div
             class="session"
             style$="grid-area: [[session.gridArea]]"
-            layout vertical
-          >
-            <template
-              is="dom-repeat"
-              items="[[_filterSessions(session.items, selectedFilters)]]"
-              as="subSession"
-            >
+            layout vertical>
+            <template is="dom-repeat" items="[[session.items]]" as="subSession">
               <session-element
                 class="subsession"
                 day-name="[[name]]"
                 session="[[subSession]]"
                 user="[[user]]"
                 featured-sessions="[[featuredSessions]]"
-                query-params="[[queryParams]]"
               ></session-element>
             </template>
           </div>
-
         </template>
+      </template>
+    </div>
 
+    <!-- <div class="grid" style$="--tracks-number: 4;"> -->
+      <div class="grid" style$="--tracks-number: [[day.tracks.length]];">
+      <template is="dom-repeat" items="[[day.timeslots]]" as="timeslot" index-as="timeslotIndex" filter="_isEvening">
+        <div id$="[[timeslot.startTime]]" class="start-time" style$="grid-area: [[_getTimePosition(timeslotIndex)]]">
+          <span class="hours">[[_splitText(timeslot.startTime, ':', 0)]]</span>
+          <span class="minutes">[[_splitText(timeslot.startTime, ':', 1)]]</span>
+        </div>
+        <a
+          class="add-session"
+          href$="/schedule/[[day.date]]#[[timeslot.startTime]]"
+          hidden$="[[!_showAddSession(timeslot, onlyFeatured)]]"
+          style$="grid-area: [[_computeEveningGridArea(timeslot.sessions.0.gridArea)]]"
+          layout horizontal center-center
+        >
+          <iron-icon class="add-session-icon" icon="hoverboard:add-circle-outline"></iron-icon>
+          <span>{$ mySchedule.browseSession $}</span>
+        </a>
+        <template
+          is="dom-repeat"
+          items="[[timeslot.sessions]]"
+          as="session"
+          index-as="sessionIndex"
+          filter="_isNotEmpty"
+        >
+          <div
+            class="session"
+            style$="grid-area: [[_computeEveningGridArea(session.gridArea)]]"
+            layout vertical>
+            <template is="dom-repeat" items="[[session.items]]" as="subSession">
+              <session-element
+                class="subsession"
+                day-name="[[name]]"
+                session="[[subSession]]"
+                user="[[user]]"
+                featured-sessions="[[featuredSessions]]"
+              ></session-element>
+            </template>
+          </div>
+        </template>
       </template>
     </div>
 
@@ -146,7 +176,7 @@
   <script>
 
     // eslint-disable-next-line no-undef
-    class ScheduleDay extends UtilsFunctions(ScrollFunctions(Polymer.Element)) {
+    class ScheduleDay extends ScrollFunctions(Polymer.Element) {
       static get is() {
         return 'schedule-day';
       }
@@ -163,8 +193,6 @@
           featuredSessions: Object,
           onlyFeatured: Boolean,
           viewport: Object,
-          selectedFilters: Object,
-          queryParams: String,
         };
       }
 
@@ -193,8 +221,27 @@
         return `${timeslotIndex + 1} / 1`;
       }
 
+      _getEveningTimePosition(timeslotIndex) {
+        return `${timeslotIndex + 1 + 9} / 1`;
+      }
+
       _splitText(text, divider, index) {
         return text.split(divider)[index];
+      }
+
+      _isMorning(timeslot) {
+        return timeslot.endTime < `14:01`;
+      }
+
+      _isEvening(timeslot) {
+        return timeslot.endTime >= `14:01`;
+      }
+
+      _computeEveningGridArea(gridArea) {
+        let split = gridArea.split(` `);
+        let toReturn = parseInt(split[0] - 9) + ` / ` + split[2] + ` / `;
+        toReturn += parseInt(split[4] - 9) + ` / ` + split[6];
+        return toReturn;
       }
 
       _showAddSession(timeslot, onlyFeatured) {
@@ -205,24 +252,6 @@
 
       _isNotEmpty(sessionBlock) {
         return !!sessionBlock.items.length;
-      }
-
-      _filterSessions(sessions, selectedFilters) {
-        if (!selectedFilters) return sessions;
-        return sessions.filter((session) => {
-          return (
-            !selectedFilters.tag
-            || !selectedFilters.tag.length
-            || session.tags
-            && !!session.tags.filter((tag) =>
-              selectedFilters.tag.includes(this.generateClassName(tag))).length
-          ) && (
-            !selectedFilters.complexity
-            || !selectedFilters.complexity.length
-            || session.complexity
-            && selectedFilters.complexity.includes(this.generateClassName(session.complexity))
-          );
-        });
       }
     }
 

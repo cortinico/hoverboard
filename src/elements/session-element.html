@@ -80,15 +80,17 @@
         line-height: 1.2;
       }
 
-      .session-description {
-        margin-top: 8px;
-      }
-
       .session-meta {
         margin: 0;
         padding: 0;
         font-size: 12px;
         color: var(--secondary-text-color);
+      }
+
+      .session-meta .extra-ticket{
+        font-size: 14px;
+        font-weight: bold;
+        color: var(--accent-color);
       }
 
       .session-footer {
@@ -140,10 +142,11 @@
 
     <a
       class="session"
-      href$="/schedule/[[dayName]]?[[toggleQueryParam(queryParams, 'sessionId', session.id)]]"
+      href$="/schedule/[[dayName]]?sessionId=[[session.id]]"
       featured$="[[isFeatured]]"
       layout vertical
       relative
+      style="background-color: [[session.backgroundColor]]"
     >
       <iron-icon
         class="session-icon"
@@ -153,13 +156,13 @@
       <div class="session-header" layout horizontal justified>
         <div flex>
           <h3 class="session-title">[[session.title]]</h3>
-          <div class="session-description" hidden$="[[_hideSessionAbstract(session.shortDescription)]]">[[session.shortDescription]]</div>
         </div>
         <span class="language">[[slice(session.language, 2)]]</span>
       </div>
 
       <div class="session-content" flex layout horizontal justified>
         <div class="session-meta">
+          <div class="extra-ticket" hidden$="[[!session.ticketUrl]]">Extra Registration Needed</div>
           <div hidden$="[[!session.complexity]]">[[session.complexity]]</div>
         </div>
         <iron-icon
@@ -179,7 +182,7 @@
           </div>
           <div hidden$="[[!session.tags.length]]">
             <template is="dom-repeat" items="[[session.tags]]" as="tag">
-              <span class="tag" style$="color: [[getVariableColor(tag)]]">[[tag]]</span>
+              <span class="tag" style$="color: [[_getTagColor(tag)]]">[[tag]]</span>
             </template>
           </div>
         </div>
@@ -223,20 +226,22 @@
           user: Object,
           session: Object,
           featuredSessions: Object,
-          queryParams: String,
           sessionColor: {
             type: String,
-            computed: 'getVariableColor(session.mainTag)',
+            computed: '_getTagColor(session.mainTag)',
           },
           isFeatured: {
             type: String,
             computed: '_isFeatured(featuredSessions, session.id)',
           },
-          showSessionShortAbstract: {
-            type: Boolean,
-            value: () => JSON.parse('{$ showSessionShortAbstract $}'),
-          },
         };
+      }
+
+      _getTagColor(value) {
+        if (ShadyCSS) {
+          return ShadyCSS.getComputedStyleValue(this, `--${this.generateClassName(value)}`);
+        }
+        return getComputedStyle(this, `--${this.generateClassName(value)}`);
       }
 
       _isFeatured(featuredSessions, sessionId) {
@@ -246,10 +251,6 @@
 
       _getEnding(number) {
         return number > 1 ? 's' : '';
-      }
-
-      _hideSessionAbstract(sesionAbstract) {
-        return !this.showSessionShortAbstract || !sesionAbstract;
       }
 
       _getFeaturedSessionIcon(featuredSessions, sessionId) {
